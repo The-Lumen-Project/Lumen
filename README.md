@@ -5,12 +5,12 @@
 />
 <br>
 
-[![License](https://img.shields.io/github/license/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://www.gnu.org/licenses/gpl-3.0)
-[![Stars](https://img.shields.io/github/stars/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/stargazers)
-[![Forks](https://img.shields.io/github/forks/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/forks)
-[![Issues](https://img.shields.io/github/issues/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/issues)
-[![Pull Requests](https://img.shields.io/github/issues-pr/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/pulls)
-[![Release](https://img.shields.io/github/v/release/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/releases/)
+[![License](https://img.shields.io/github/license/The-Lumen-Project/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://www.gnu.org/licenses/gpl-3.0)
+[![Stars](https://img.shields.io/github/stars/The-Lumen-Project/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/The-Lumen-Project/Lumen/stargazers)
+[![Forks](https://img.shields.io/github/forks/The-Lumen-Project/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/The-Lumen-Project/Lumen/forks)
+[![Issues](https://img.shields.io/github/issues/The-Lumen-Project/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/The-Lumen-Project/Lumen/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/The-Lumen-Project/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/The-Lumen-Project/Lumen/pulls)
+[![Release](https://img.shields.io/github/v/release/The-Lumen-Project/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/The-Lumen-Project/Lumen/releases/)
 
 </div>
 
