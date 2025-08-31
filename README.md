@@ -35,8 +35,8 @@ It has familiar syntax that is great for beginners who want to learn C languages
 and is great as an intermediate language between Python and C, as it teaches many C concepts while keeping the friendliness of Python.
 
 ## Contributors:
-<a href = "https://github.com/this-guy-git/Lumen/contributors">
-  <img src = "https://contrib.rocks/image?repo=this-guy-git/Lumen"/>
+<a href = "https://github.com/The-Lumen-Project/Lumen/contributors">
+  <img src = "https://contrib.rocks/image?repo=The-Lumen-Project/Lumen"/>
 </a>
 
 ## Examples:
