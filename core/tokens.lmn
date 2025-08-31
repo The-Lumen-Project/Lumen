@@ -1,0 +1,5 @@
+ary tokens [
+    "return",
+    "int",
+    "semi"
+];
