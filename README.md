@@ -1,15 +1,30 @@
+<div align="center">
 
-![LumenLogo](https://github.com/user-attachments/assets/599108ab-4bca-4d1f-bc1d-e5147f2e3f97)
+<img src="https://github.com/user-attachments/assets/651302ec-c5ec-4776-ab7e-e37dba3cf6ea"
+     width="700" 
+/>
+<br>
 
-![License](https://img.shields.io/github/license/this-guy-git/Lumen)
-![Release](https://img.shields.io/github/v/release/this-guy-git/Lumen)
-![Issues](https://img.shields.io/github/issues/this-guy-git/Lumen)
-![Stars](https://img.shields.io/github/stars/this-guy-git/Lumen?style=flat&color=4c1&labelColor=555)
-![Forks](https://img.shields.io/github/forks/this-guy-git/Lumen?style=flat&color=4c1&labelColor=555)
-![Pull Requests](https://img.shields.io/github/issues-pr/this-guy-git/Lumen)
-![Repo Size](https://img.shields.io/github/repo-size/this-guy-git/Lumen)
-![Python 3.12](https://img.shields.io/badge/Python-3.12-blue)
+[![License](https://img.shields.io/github/license/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://www.gnu.org/licenses/gpl-3.0)
+[![Stars](https://img.shields.io/github/stars/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/stargazers)
+[![Forks](https://img.shields.io/github/forks/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/forks)
+[![Issues](https://img.shields.io/github/issues/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/pulls)
+[![Release](https://img.shields.io/github/v/release/this-guy-git/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/this-guy-git/Lumen/releases/)
 
+</div>
+
+
+## Table of Contents
+- [Lumen](#lumen)
+- [Contributors](#contributors)
+- [Examples](#examples)
+  - [Goto Label Logic](#goto-label-logic)
+  - [Functions](#functions)
+  - [Conditional Logic](#conditional-logic)
+  - [Declaring Variables](#declaring-variables)
+  - [Example Program](#example-program)
+- [License](#license)
 
 
 
@@ -98,3 +113,15 @@ program(thing, number);
 print dictThing["key1"]; // Will return "content1"
 print arrayThing[1]; // Will return "Index 1"
 ```
+## License
+
+Lumen is distributed under the terms of the **GNU General Public License v3.0 (GPLv3)**.  
+This license guarantees that Lumen and any derivative works remain free software.  
+
+In plain terms:  
+- You may use, study, modify, and share Lumen freely.  
+- Any modifications or derivative works **must** also be released under GPLv3, with full source code available.  
+- You may distribute Lumen (original or modified), but you may not relicense it under terms that restrict user freedoms.  
+- Commercial distribution is permitted under GPLv3, but all recipients retain the same rights to the source code and to redistribute it.  
+
+The intention of this license is to ensure that Lumen, and all works based on it, remain free and open for the entire community.
