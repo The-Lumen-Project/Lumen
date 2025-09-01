@@ -644,7 +644,7 @@ class PythonCodeGenerator:
                         raise LumenSyntaxError("Invalid increment statement")
                     # Don't need to check variable existence here - it's handled by the parser
                     py_code += f"{self.get_indent()}{stmt[1]} += 1\n"
-                
+
                 elif stmt_type == "dec":
                     if len(stmt) != 2:
                         raise LumenSyntaxError("Invalid decrement statement")
@@ -804,9 +804,25 @@ def compile_to_binary(python_file_path, debug=False):
         if debug:
             print("Installing PyInstaller...")
         
+        # Find the Python interpreter (not the lumen executable)
+        python_executable = sys.executable
+        # If we're running as lumen.exe, try to find the actual Python interpreter
+        if "lumen" in python_executable.lower() or python_executable.endswith(".exe"):
+            # Try common Python executable names
+            python_candidates = ["python", "python3", "py"]
+            for candidate in python_candidates:
+                try:
+                    # Check if this Python command exists
+                    result = subprocess.run([candidate, "--version"], capture_output=True, timeout=5)
+                    if result.returncode == 0:
+                        python_executable = candidate
+                        break
+                except (FileNotFoundError, subprocess.TimeoutExpired):
+                    continue
+        
         # Install PyInstaller
         install_result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "pyinstaller"],
+            [python_executable, "-m", "pip", "install", "pyinstaller"],
             capture_output=True,
             text=True,
             timeout=120  # 2 minute timeout
@@ -820,8 +836,10 @@ def compile_to_binary(python_file_path, debug=False):
         
         # Compile with PyInstaller
         compile_result = subprocess.run([
-            sys.executable, "-m", "PyInstaller",
+            python_executable, "-m", "PyInstaller",
             "--onefile",
+            "--hidden-import=lmnast",
+            "--hidden-import=config",
             str(python_file_path)
         ], capture_output=True, text=True, timeout=300)  # 5 minute timeout
         

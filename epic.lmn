@@ -1,0 +1,19 @@
+str hello "Lukas";
+
+int old 15;
+
+ary exampleArray[0,1];
+dic exampleDict{
+    "greet":"hello";
+    "gesture":"wave";
+    "face":"smile";
+};
+
+fun greet(name, age) {
+    print "Hello", name;
+    print "You are", age, "years old";
+};
+
+greet(hello, old);
+
+print "hello";
