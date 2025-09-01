@@ -1,0 +1,6 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\The-Lumen-Project\Lumen]
+"InstallDir"="C:\\Program Files\\Lumen"
+"Version"="1.0.0"
+"BinPath"="C:\\Program Files\\Lumen\\lumen.exe"
