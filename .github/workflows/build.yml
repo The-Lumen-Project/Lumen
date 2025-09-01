@@ -30,7 +30,7 @@ jobs:
 
       - name: Build executable
         run: |
-          python3 /compile.py
+          python3 ./compile.py
           
       - name: Upload binary
         uses: actions/upload-artifact@v4
