@@ -36,4 +36,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lumen-${{ matrix.os }}
-          path: dist/*
+          path: ./dist/
