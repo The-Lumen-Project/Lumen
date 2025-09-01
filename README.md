@@ -11,6 +11,8 @@
 [![Issues](https://img.shields.io/github/issues/The-Lumen-Project/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/The-Lumen-Project/Lumen/issues)
 [![Pull Requests](https://img.shields.io/github/issues-pr/The-Lumen-Project/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/The-Lumen-Project/Lumen/pulls)
 [![Release](https://img.shields.io/github/v/release/The-Lumen-Project/Lumen?style=flat&color=FFCE50&labelColor=222222)](https://github.com/The-Lumen-Project/Lumen/releases/)
+![Build Lumen](https://github.com/The-Lumen-Project/Lumen/actions/workflows/build.yml/badge.svg?style=flat&color=FFCE50&labelColor=222222)
+
 
 </div>
 
