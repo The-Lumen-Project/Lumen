@@ -20,6 +20,7 @@
 ## Table of Contents
 - [Lumen](#lumen)
 - [Contributors](#contributors)
+- [Changelog](/CHANGELOG.md)
 - [Examples](#examples)
   - [Goto Label Logic](#goto-label-logic)
   - [Functions](#functions)
