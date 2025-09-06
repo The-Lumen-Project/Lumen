@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - For loops support (Maybe?)
 - Other features in progress
 
-## [0.2.0] - 2025-09-03
+## [0.2.0] - 2025-09-06
 ##### *[unknown] total lines*
 ### Added
 - .lmnh Header support
