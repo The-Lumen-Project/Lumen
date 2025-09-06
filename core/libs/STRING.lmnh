@@ -1,0 +1,27 @@
+[INFO]
+name = STRING
+description = String manipulation for Lumen.
+
+[IMPORTS]
+imports: string
+
+[CONSTANTS]
+asciichars = string.ascii_letters
+asciicharslow = string.ascii_lowercase
+asciicharsup = string.ascii_uppercase
+digits = string.digits
+hexdigits = string.hexdigits
+octdigits = string.octdigits
+punct = string.punctuation
+printable = string.printable
+whitespace = string.whitespace
+
+
+[FUNCTIONS]
+capwords(x) = string.capwords(x)
+sub(x) = string.substitute(x)
+ssub(x) = string.safe_substitute(x)
+len(x) = len(x)
+
+
+

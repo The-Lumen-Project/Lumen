@@ -1,0 +1,24 @@
+[INFO]
+name = RANDOM
+description = Random library for Lumen
+
+[IMPORTS]
+imports: random
+
+[CONSTANTS]
+
+
+[FUNCTIONS]
+seed(x) = random.seed(x)
+getstate() = random.getstate()
+setstate(x) = random.setstate(x)
+getrandbits(x) = random.getrandbits(x)
+randrange(x, y) = random.randrange(x, y)
+randint(x, y) = random.randint(x, y)
+choice(x) = random.choice(x)
+choices(x, y, z) = random.choices(x, y, z)
+shuffle(x) = random.shuffle(x)
+sample(x, y) = random.sample(x, y)
+random() = random.random()
+uniform(x, y) = random.uniform(x, y)
+

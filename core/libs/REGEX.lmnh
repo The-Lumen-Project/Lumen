@@ -1,0 +1,23 @@
+[INFO]
+name = REGEX
+description = Regular Expression for Lumen.
+
+[IMPORTS]
+imports: re
+
+[CONSTANTS]
+// this is for someone smarter to figure out...
+//ascii = re.A
+//debug = re.DEBUG
+//dotall = re.S
+//ignorecase = re.I
+//multiline = re.M
+//noflag = re.NOFLAG
+//unicode = re.U
+//verbose = re.X
+
+[FUNCTIONS]
+search(x, y) = re.search(x, y)
+findall(x, y) = re.findall(x, y)
+split(x, y, z) = re.findall(x, y, z)
+sub(x, y, z) = re.sub(x, y, z)

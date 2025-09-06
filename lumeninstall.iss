@@ -2,13 +2,15 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Lumen"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "The Lumen Project"
 #define MyAppURL "https://thisguylabs.com/Lumen/"
 #define MyAppExeName "lumen.exe"
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".lmn"
+#define MyAppAssocExtHead ".lmnh"
 #define MyAppAssocKey StringChange(MyAppAssocName, " ", "") + MyAppAssocExt
+#define MyAppAssocKeyHead StringChange(MyAppAssocName, " ", "") + MyAppAssocExtHead
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -33,43 +35,50 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
-LicenseFile=C:\Users\withe\Desktop\VSCode\Python\Lumen\LICENSE
+LicenseFile=C:\Users\withe\Desktop\VSCode\Python\Lumen\language\LICENSE
 ; Remove the following line to run in administrative install mode (install for all users).
 OutputBaseFilename=lumen
-SetupIconFile=C:\Users\withe\Desktop\VSCode\Python\Lumen\lumen.ico
+SetupIconFile=C:\Users\withe\Desktop\VSCode\Python\Lumen\language\lumen.ico
 SolidCompression=yes
 WizardStyle=modern
+DisableDirPage=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
 
 [Files]
-Source: "C:\Users\withe\Desktop\VSCode\Python\Lumen\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\withe\Desktop\VSCode\Python\Lumen\python\*"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\withe\Desktop\VSCode\Python\Lumen\core\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "C:\Users\withe\Desktop\VSCode\Python\Lumen\language\core\*"; DestDir: "{app}\_internal"; Flags: recursesubdirs createallsubdirs
+Source: "C:\Users\withe\Desktop\VSCode\Python\Lumen\language\header.ico"; DestDir: "{app}"
+Source: "C:\Users\withe\Desktop\VSCode\Python\Lumen\language\dist\lumen\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Registry]
+; --- Associate .lmn files ---
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocExt}\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKey}"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocName}"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKey}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKey}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+
+; --- Associate .lmnh files ---
+Root: HKA; Subkey: "Software\Classes\{#MyAppAssocExtHead}\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKeyHead}"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKeyHead}"; ValueType: string; ValueName: ""; ValueData: "{#MyAppName} Header File"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKeyHead}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\header.ico"
+Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKeyHead}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+
 ;Registry data from file lmnreg.reg
 Root: HKCU; Subkey: "Software\The-Lumen-Project\Lumen"; Flags: uninsdeletekeyifempty; Check: not IsAdminInstallMode
 Root: HKCU; Subkey: "Software\The-Lumen-Project\Lumen"; ValueType: string; ValueName: "InstallDir"; ValueData: "C:\Program Files\Lumen"; Flags: uninsdeletevalue; Check: not IsAdminInstallMode
-Root: HKCU; Subkey: "Software\The-Lumen-Project\Lumen"; ValueType: string; ValueName: "Version"; ValueData: "1.0.0"; Flags: uninsdeletevalue; Check: not IsAdminInstallMode
+Root: HKCU; Subkey: "Software\The-Lumen-Project\Lumen"; ValueType: string; ValueName: "Version"; ValueData: "0.2.0"; Flags: uninsdeletevalue; Check: not IsAdminInstallMode
 Root: HKCU; Subkey: "Software\The-Lumen-Project\Lumen"; ValueType: string; ValueName: "BinPath"; ValueData: "C:\Program Files\Lumen\lumen.exe"; Flags: uninsdeletevalue; Check: not IsAdminInstallMode
 ;End of registry data from file lmnreg.reg
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 Filename: "cmd.exe"; Parameters: "/C setx PATH ""%PATH%;{app}"""; \
   StatusMsg: "Adding Lumen to PATH..."; Flags: runhidden
 

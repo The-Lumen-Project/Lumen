@@ -2,6 +2,8 @@ import re
 import os
 import config
 from pathlib import Path
+from lmnlib import load_library
+from pathlib import Path
 
 class LumenParseError(Exception):
     """Base exception for parsing errors"""
@@ -62,15 +64,42 @@ class ExpressionParser:
         """Check if token is an operator"""
         return token in self.operators
     
+    def is_number(self, value):
+        """Check if a string represents a number (int or float)"""
+        if not isinstance(value, str):
+            return False
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
+        
+    def is_expression(self, value):
+        """Check if a value is an expression that needs evaluation"""
+        if not isinstance(value, str):
+            return False
+        
+        # Skip if it's a literal
+        if (value.startswith(('"', "'")) or 
+            self.is_number(value) or 
+            value.lower() in ('true', 'false')):
+            return False
+        
+        # Check if it contains operators, function calls, or library access
+        operators = ['+', '-', '*', '/', '%', '==', '!=', '<', '>', '<=', '>=', 
+                    '&&', '||', 'and', 'or', 'not', '!']
+        
+        return (any(op in value for op in operators) or 
+                '(' in value or 
+                '.' in value)  # Include library access
+
+    
     def is_operand(self, token):
         """Check if token is an operand (number, string, variable)"""
         if isinstance(token, str):
             # Check if it's a number
-            try:
-                float(token)
+            if self.is_number(token):
                 return True
-            except ValueError:
-                pass
             
             # Check if it's a string literal
             if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
@@ -87,9 +116,15 @@ class ExpressionParser:
         if not tokens:
             return None
 
-        # If it's just a single token, return it
+        # If it's just a single token, return it as-is
         if len(tokens) == 1:
             return tokens[0]
+
+        # Check if this is a function call pattern
+        if (len(tokens) >= 3 and 
+            tokens[1] == "(" and 
+            re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', tokens[0])):
+            return self.parse_function_call_expression(tokens)
 
         # Convert infix to postfix and then back to a Python expression
         output = []
@@ -138,13 +173,17 @@ class ExpressionParser:
 
         # Convert postfix back to infix Python expression
         return self.postfix_to_python(output)
+
     
     def parse_function_call_expression(self, tokens):
         """Parse function call within an expression"""
+        if len(tokens) < 3:
+            raise LumenSyntaxError("Invalid function call format")
+
         func_name = tokens[0]
         if tokens[1] != '(':
             raise LumenSyntaxError(f"Expected '(' after function name '{func_name}'")
-        
+
         # Find matching parenthesis
         paren_count = 0
         end_paren = -1
@@ -159,7 +198,7 @@ class ExpressionParser:
 
         if end_paren == -1:
             raise LumenSyntaxError("Unmatched parenthesis in function call")
-        
+
         # Parse arguments
         arg_tokens = tokens[2:end_paren]
         args = []
@@ -176,9 +215,9 @@ class ExpressionParser:
             if current_arg:
                 arg_expr = self.parse_expression(current_arg)
                 args.append(arg_expr)
-        
+
         # Return function call as expression
-        args_str = ', '.join(args) if args else ''
+        args_str = ', '.join(str(arg) for arg in args) if args else ''
         return f"{func_name}({args_str})"
     
     def postfix_to_python(self, postfix):
@@ -237,6 +276,45 @@ class SymbolTable:
         self.scope_stack = ['global']
         self.static_vars = {}
         self.global_vars = {}
+        self.libraries = {}  # Store loaded libraries
+        self.install_dir = None  # Will be set by compiler
+    
+    def set_install_dir(self, install_dir):
+        """Set the installation directory for library loading"""
+        self.install_dir = Path(install_dir)
+    
+    def load_system_library(self, lib_name):
+        """Load a system library (#include <LIBNAME>)"""
+        if lib_name in self.libraries:
+            return  # Already loaded
+        
+        try:
+            # Use the updated load_library function from lmnlib
+            from lmnlib import load_library
+            library = load_library(lib_name, system=True, install_dir=self.install_dir)
+            self.libraries[lib_name.lower()] = library
+        except Exception as e:
+            raise LumenSemanticError(f"Failed to load system library '{lib_name}': {e}")
+    
+    def load_package_library(self, lib_name):
+        """Load a package library (#import PACKAGENAME)"""
+        if lib_name in self.libraries:
+            return  # Already loaded
+        
+        try:
+            # Use the updated load_library function from lmnlib
+            from lmnlib import load_library
+            library = load_library(lib_name, system=False, install_dir=self.install_dir)
+            self.libraries[lib_name.lower()] = library
+        except Exception as e:
+            raise LumenSemanticError(f"Failed to load package '{lib_name}': {e}")
+    
+    def get_library(self, lib_name):
+        """Get a loaded library"""
+        lib_key = lib_name.lower()
+        if lib_key not in self.libraries:
+            raise LumenSemanticError(f"Library '{lib_name}' not loaded")
+        return self.libraries[lib_key]
     
     def enter_scope(self, scope_name):
         self.scope_stack.append(scope_name)
@@ -302,7 +380,9 @@ class SymbolTable:
             self.declare_variable(name, 'var', value)
             return
         else:
-            raise LumenSemanticError(f"Undefined variable '{name}'")
+            # Allow assignment to create new variables (like many dynamic languages)
+            self.declare_variable(name, 'var', value)
+            return
 
         if not self.check_type_compatibility(symbol.var_type, value):
             raise LumenSemanticError(f"Type mismatch: Cannot assign {self.infer_type(value)} to {symbol.var_type} variable '{name}'")
@@ -344,7 +424,8 @@ class SymbolTable:
         elif name in self.symbols:  # Check global scope
             return self.symbols[name]
         else:
-            raise LumenSemanticError(f"Undefined variable '{name}'")
+            # Don't raise error here - allow undefined variables for dynamic behavior
+            return Symbol(name, 'var', None, False, scope)
 
     def get_function_parameters(self, function_name):
         """Get the parameters of a function"""
@@ -437,7 +518,8 @@ def tokenize_lumen_file(file_path):
         # Remove comments before tokenization
         code = remove_comments(code)
         
-        pattern = r'(\".*?\"|\'.*?\'|\w+:|\+\+|--|==|!=|<=|>=|&&|\|\||[{}()\[\];,:=<>+\-*/%!]|[^\s{}()\[\];,:=<>+\-*/%!]+)'
+        # Enhanced pattern to handle # directives and library access
+        pattern = r'(#include|#import|\"[^\"]*\"|\'[^\']*\'|\w+:|\+\+|--|==|!=|<=|>=|&&|\|\||[{}()\[\];,:=<>+\-*/%!.]|[^\s{}()\[\];,:=<>+\-*/%!.]+)'
         
         try:
             tokens = re.findall(pattern, code)
@@ -451,21 +533,26 @@ def tokenize_lumen_file(file_path):
         final_tokens = []
         i = 0
         while i < len(tokens):
-            token = tokens[i]
+            token = tokens[i].strip()
+            
+            if not token:  # Skip empty tokens
+                i += 1
+                continue
 
             # Handle multi-character operators that might be separated
             if i + 1 < len(tokens):
-                combined = token + tokens[i + 1]
+                next_token = tokens[i + 1].strip()
+                combined = token + next_token
                 if combined in ['==', '!=', '<=', '>=', '&&', '||', '++', '--']:
                     final_tokens.append(combined)
                     i += 2
                     continue
                 # Also check for && and || as separate tokens
-                elif token == '&' and tokens[i + 1] == '&':
+                elif token == '&' and next_token == '&':
                     final_tokens.append('&&')
                     i += 2
                     continue
-                elif token == '|' and tokens[i + 1] == '|':
+                elif token == '|' and next_token == '|':
                     final_tokens.append('||')
                     i += 2
                     continue
@@ -624,6 +711,7 @@ def parse_value_expression(tokens, start_index):
     end_index = start_index
     paren_depth = 0
     bracket_depth = 0
+    brace_depth = 0
     
     while end_index < len(tokens):
         token = tokens[end_index]
@@ -636,9 +724,13 @@ def parse_value_expression(tokens, start_index):
             bracket_depth += 1
         elif token == ']':
             bracket_depth -= 1
-        elif token == ';' and paren_depth == 0 and bracket_depth == 0:
+        elif token == '{':
+            brace_depth += 1
+        elif token == '}':
+            brace_depth -= 1
+        elif token == ';' and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
             break
-        elif token in ['{', '}'] and paren_depth == 0 and bracket_depth == 0:
+        elif token in ['{', '}'] and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
             break
         
         end_index += 1
@@ -653,8 +745,12 @@ def parse_value_expression(tokens, start_index):
         expression = expression_parser.parse_expression(value_tokens)
         return expression, end_index
     except Exception as e:
-        # If expression parsing fails, treat as simple concatenation
-        return ' '.join(value_tokens), end_index
+        # If expression parsing fails, treat as simple concatenation for simple cases
+        if len(value_tokens) == 1:
+            return value_tokens[0], end_index
+        else:
+            # For complex expressions, join with spaces
+            return ' '.join(value_tokens), end_index
 
 def parse_label(tokens, start_index):
     """Parse a label definition: labelName:"""
@@ -839,7 +935,7 @@ def parse_tokens(tokens):
             t = tokens[i]
 
             # Skip empty tokens
-            if not t.strip():
+            if not t or not t.strip():
                 i += 1
                 continue
 
@@ -899,6 +995,27 @@ def parse_tokens(tokens):
 
                 ast.append(("global", var_type, name, value_expr))
                 i = end_index + 1
+                
+                        # Library include directive
+            elif t == "#include":
+                include_ast, next_i = parse_include_directive(tokens, i)
+                lib_name = include_ast[1]
+
+                # Load the system library during parsing
+                symbol_table.load_system_library(lib_name)
+
+                ast.append(include_ast)
+                i = next_i
+            
+            # Package import directive  
+            elif t == "#import":
+                import_ast, next_i = parse_import_directive(tokens, i)
+                package_name = import_ast[1]
+
+                # Note: Packages are loaded at compile time, not parse time
+                ast.append(import_ast)
+                i = next_i
+
 
             elif t.endswith(':'):
                 label_ast, next_i = parse_label(tokens, i)
@@ -921,7 +1038,7 @@ def parse_tokens(tokens):
                     i += 1
                     if i >= len(tokens):
                         raise LumenSyntaxError("Expected type after 'static'", position=i-1)
-                    if tokens[i] not in ("int", "str", "var", "ary", "dic"):
+                    if tokens[i] not in ("int", "str", "var", "ary", "dic", "bool"):
                         raise LumenSyntaxError(f"Invalid type '{tokens[i]}' after 'static'", 
                                              token=tokens[i], position=i)
                     var_type = tokens[i]
@@ -980,41 +1097,121 @@ def parse_tokens(tokens):
                     ast.append(("declare", var_type, name, value_expr, is_static))
                     i = end_index + 1
 
-            # Print statement
+            # Print statement with improved parsing
             elif t.startswith("print"):
                 args = []
-                if len(t) > 5:  # print has content attached
-                    args.append(t[6:])
                 
                 i += 1
+                # Collect all tokens until semicolon
+                print_tokens = []
                 while i < len(tokens) and tokens[i] != ";":
-                    # Check for array/dictionary access: variable[ ... ]
-                    if (i + 1 < len(tokens) and tokens[i+1] == "[" and
-                        tokens[i] not in ('if', 'while', 'fun', 'print', 'return', 'int', 'str', 'var', 'static', 'ary', 'dic')):
-                        
-                        variable_name = tokens[i]
-                        bracket_start = i + 1
-                        
-                        try:
-                            bracket_end = find_matching_bracket(tokens, bracket_start)
-                        except LumenSyntaxError as e:
-                            raise LumenSyntaxError(f"Error in array/dict access: {e}")
-                        
-                        # Extract inner content and parse as expression
-                        inner_tokens = tokens[bracket_start + 1:bracket_end]
-                        inner_content = expression_parser.parse_expression(inner_tokens) if inner_tokens else ""
-                        
-                        # Create combined access expression
-                        access_expr = f"{variable_name}[{inner_content}]"
-                        args.append(access_expr)
-                        
-                        i = bracket_end + 1
-                    else:
-                        args.append(tokens[i])
-                        i += 1
+                    print_tokens.append(tokens[i])
+                    i += 1
                 
                 if i >= len(tokens):
                     raise LumenSyntaxError("Missing semicolon after print statement", position=i-1)
+                
+                # Parse the print tokens as a single expression
+                if print_tokens:
+                    # Check for library access first
+                    j = 0
+                    while j < len(print_tokens):
+                        # Check for library.member pattern
+                        if (j + 2 < len(print_tokens) and 
+                            print_tokens[j + 1] == "." and
+                            re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', print_tokens[j])):
+                            
+                            lib_name = print_tokens[j]
+                            member_name = print_tokens[j + 2]
+                            
+                            # Check if it's a function call
+                            if (j + 3 < len(print_tokens) and print_tokens[j + 3] == "("):
+                                # Find the end of the function call
+                                paren_count = 0
+                                end_idx = j + 3
+                                while end_idx < len(print_tokens):
+                                    if print_tokens[end_idx] == "(":
+                                        paren_count += 1
+                                    elif print_tokens[end_idx] == ")":
+                                        paren_count -= 1
+                                        if paren_count == 0:
+                                            break
+                                    end_idx += 1
+                                
+                                if paren_count == 0:
+                                    # Extract function call tokens
+                                    func_call_tokens = print_tokens[j:end_idx + 1]
+                                    # Parse arguments
+                                    arg_tokens = print_tokens[j + 4:end_idx]
+                                    func_args = []
+                                    if arg_tokens:
+                                        current_arg = []
+                                        for token in arg_tokens:
+                                            if token == ",":
+                                                if current_arg:
+                                                    arg_expr = expression_parser.parse_expression(current_arg)
+                                                    func_args.append(str(arg_expr))
+                                                    current_arg = []
+                                            else:
+                                                current_arg.append(token)
+                                        if current_arg:
+                                            arg_expr = expression_parser.parse_expression(current_arg)
+                                            func_args.append(str(arg_expr))
+                                    
+                                    args_str = ", ".join(func_args) if func_args else ""
+                                    lib_call = f"{lib_name.lower()}.{member_name}({args_str})"
+                                    args.append(lib_call)
+                                    j = end_idx + 1
+                                    continue
+                            else:
+                                # It's a property access
+                                lib_access = f"{lib_name.lower()}.{member_name}"
+                                args.append(lib_access)
+                                j += 3
+                                continue
+                        
+                        # Not library access, process normally
+                        # Check if this starts a function call
+                        if (j + 1 < len(print_tokens) and print_tokens[j + 1] == "(" and
+                            re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', print_tokens[j])):
+                            
+                            # Find the end of function call
+                            paren_count = 0
+                            end_idx = j + 1
+                            while end_idx < len(print_tokens):
+                                if print_tokens[end_idx] == "(":
+                                    paren_count += 1
+                                elif print_tokens[end_idx] == ")":
+                                    paren_count -= 1
+                                    if paren_count == 0:
+                                        break
+                                end_idx += 1
+                            
+                            if paren_count == 0:
+                                func_call_tokens = print_tokens[j:end_idx + 1]
+                                func_call_expr = expression_parser.parse_function_call_expression(func_call_tokens)
+                                args.append(func_call_expr)
+                                j = end_idx + 1
+                                continue
+                        
+                        # Single token or start of complex expression
+                        expr_tokens = []
+                        while j < len(print_tokens):
+                            token = print_tokens[j]
+                            if token == ",":
+                                break
+                            expr_tokens.append(token)
+                            j += 1
+                        
+                        if expr_tokens:
+                            if len(expr_tokens) == 1:
+                                args.append(expr_tokens[0])
+                            else:
+                                expr = expression_parser.parse_expression(expr_tokens)
+                                args.append(expr)
+                        
+                        if j < len(print_tokens) and print_tokens[j] == ",":
+                            j += 1  # Skip comma
                 
                 if not args:
                     raise LumenSyntaxError("Print statement cannot be empty")
@@ -1100,19 +1297,19 @@ def parse_tokens(tokens):
                 arg_tokens = tokens[args_start+1:args_end]
                 params = []
                 if arg_tokens:
-                    current_param = ""
+                    current_param = []
                     for token in arg_tokens:
                         if token == ",":
-                            if current_param.strip():
-                                param_name = current_param.strip()
+                            if current_param:
+                                param_name = ''.join(current_param).strip()
                                 validate_identifier(param_name)
                                 params.append(param_name)
-                                current_param = ""
+                                current_param = []
                         else:
-                            current_param += token + " "
+                            current_param.append(token)
 
-                    if current_param.strip():
-                        param_name = current_param.strip()
+                    if current_param:
+                        param_name = ''.join(current_param).strip()
                         validate_identifier(param_name)
                         params.append(param_name)
 
@@ -1199,7 +1396,7 @@ def parse_tokens(tokens):
                   i + 1 < len(tokens) and 
                   (tokens[i+1] in ("=", "[") or 
                    (tokens[i+1] not in ("++", "--", "(") and
-                    not tokens[i+1].startswith(("int", "str", "var", "static", "if", "while", "fun", "return", "print"))))):
+                    tokens[i+1] not in ("int", "str", "var", "static", "if", "while", "fun", "return", "print")))):
 
                 name = t
                 validate_identifier(name, i)
@@ -1299,6 +1496,83 @@ def parse_tokens(tokens):
 
     return ast
 
+def parse_include_directive(tokens, start_index):
+    """Parse #include <LIBNAME>; directive"""
+    if start_index + 3 >= len(tokens):
+        raise LumenSyntaxError("Incomplete #include directive", position=start_index)
+    
+    if tokens[start_index] != "#include":
+        raise LumenSyntaxError(f"Expected '#include', got '{tokens[start_index]}'", position=start_index)
+    
+    if tokens[start_index + 1] != "<":
+        raise LumenSyntaxError(f"Expected '<' after #include", position=start_index + 1)
+    
+    lib_name = tokens[start_index + 2]
+    
+    # Validate library name format (must be uppercase)
+    if not lib_name.isupper():
+        raise LumenSyntaxError(f"Library name must be uppercase: '{lib_name}'", position=start_index + 2)
+    
+    if tokens[start_index + 3] != ">":
+        raise LumenSyntaxError(f"Expected '>' after library name", position=start_index + 3)
+    
+    if start_index + 4 >= len(tokens) or tokens[start_index + 4] != ";":
+        raise LumenSyntaxError(f"Expected ';' after #include directive", position=start_index + 4)
+    
+    return ("include", lib_name), start_index + 5
+
+def parse_import_directive(tokens, start_index):
+    """Parse #import PACKAGE_NAME; directive"""
+    if start_index + 2 >= len(tokens):
+        raise LumenSyntaxError("Incomplete #import directive", position=start_index)
+    
+    if tokens[start_index] != "#import":
+        raise LumenSyntaxError(f"Expected '#import', got '{tokens[start_index]}'", position=start_index)
+    
+    package_name = tokens[start_index + 1]
+    
+    # Validate package name format (must be uppercase)
+    if not package_name.isupper():
+        raise LumenSyntaxError(f"Package name must be uppercase: '{package_name}'", position=start_index + 1)
+    
+    if start_index + 2 >= len(tokens) or tokens[start_index + 2] != ";":
+        raise LumenSyntaxError(f"Expected ';' after package name", position=start_index + 2)
+    
+    return ("import", package_name), start_index + 3
+
+def parse_library_access(tokens, start_index):
+    """Parse library.function() or library.constant access"""
+    lib_name = tokens[start_index]
+    if start_index + 2 >= len(tokens) or tokens[start_index + 1] != ".":
+        return None  # Not a library access
+    member_name = tokens[start_index + 2]
+    # Check if it's a function call: library.function(args)
+    if (start_index + 3 < len(tokens) and tokens[start_index + 3] == "("):
+        try:
+            paren_end = find_matching_paren(tokens, start_index + 3)
+        except LumenSyntaxError as e:
+            raise LumenSyntaxError(f"Error in library function call: {e}")
+        # Parse arguments
+        arg_tokens = tokens[start_index + 4:paren_end]
+        args = []
+        if arg_tokens:
+            current_arg = []
+            for token in arg_tokens:
+                if token == ",":
+                    if current_arg:
+                        arg_expr = expression_parser.parse_expression(current_arg)
+                        args.append(arg_expr)
+                        current_arg = []
+                else:
+                    current_arg.append(token)
+            if current_arg:
+                arg_expr = expression_parser.parse_expression(current_arg)
+                args.append(arg_expr)
+        return ("lib_call", lib_name, member_name, args), paren_end + 1
+    else:
+        # It's a constant or property access: library.constant
+        return ("lib_access", lib_name, member_name), start_index + 3
+
 # ------------------ Entry ------------------
 def parse_lumen_file(file_path):
     """Parse a Lumen file with comprehensive error handling"""
@@ -1351,6 +1625,10 @@ def test_parser():
             # Complex expressions
             ("int x 2 * 3 + 4; print x;", "Precedence test"),
             ("int a 5; int b a * 2 + 3; print b;", "Mixed variables and literals"),
+            
+            # Array and dictionary tests
+            ("ary numbers[1, 2, 3]; print numbers[0];", "Array declaration and access"),
+            ("dic data{\"key\":\"value\"}; print data[\"key\"];", "Dictionary declaration and access"),
         ]
         
         for test_code, description in test_cases:

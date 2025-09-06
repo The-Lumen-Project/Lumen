@@ -1,0 +1,19 @@
+[INFO]
+name = REQUESTS
+description = Requests library for Lumen
+
+[IMPORTS]
+imports: requests
+
+[CONSTANTS]
+
+
+[FUNCTIONS]
+delete(x, y) = request.delete(x, y)
+get(x, y, z) = request.get(x, y, z)
+head(x, y) = request.head(x, y)
+patch(x, y, z) = request.patch(x, y, z)
+post(x, y, z, a) = request.post(x, y, z, a)
+put(x, y, z) = request.put(x, y, z)
+request(x, y, z) = request.request(x, y, z)
+

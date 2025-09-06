@@ -1,0 +1,65 @@
+[INFO]
+name = MATH
+description = Standard math functions
+
+[IMPORTS]
+imports: math
+
+[CONSTANTS]
+pi = math.pi
+e = math.e
+inf = math.inf
+nan = math.nan
+tau = math.tau
+
+[FUNCTIONS]
+
+acos(x) = math.acos(x)
+acosh(x) = math.acosh(x)
+asin(x) = math.asin(x)
+asinh(x) = math.asinh(x)
+atan(x) = math.atan(x)
+atan2(x, y) = math.atan2(x, y)
+atanh(x) = math.atanh(x)
+ceil(x) = math.ceil(x)
+comb(x, y) = math.comb(x, y)
+copysign(x, y) = math.copysign(x, y)
+cos(x) = math.cos(x)
+cosh(x) = math.cosh(x)
+degrees(x) = math.degrees(x)
+dist(x, y) = math.dist(x, y)
+erf(x) = math.erf(x)
+erfc(x) = math.erfc(x)
+exp(x) = math.exp(x)
+expm1(x) = math.expm1(x)
+fabs(x) = math.fabs(x)
+factorial(x) = math.factorial(x)
+floor(x) = math.floor(x)
+fmod(x, y) = math.fmod(x, y)
+frexp(x) = math.frexp(x)
+fsum(x) = math.fsum(x)
+gamma(x) = math.gamma(x)
+gcd(x, y) = math.gcd(x, y)
+hypot(x, y) = math.hypot(x, y)
+isclose(x, y) = math.isclose(x, y)
+isfinite(x) = math.isfinite(x)
+isinf(x) = math.isinf(x)
+isnan(x) = math.isnan(x)
+isqrt(x) = math.isqrt(x)
+ldexp(x, y) = math.ldexp(x, y)
+lgamma(x) = math.lgamma(x)
+log(x) = math.log(x)
+log10(x) = math.log10(x)
+log1p(x) = math.log1p(x)
+log2(x) = math.log2(x)
+perm(x, y) = math.perm(x, y)
+pow(x, y) = math.pow(x, y)
+prod(x) = math.prod(x)
+radians(x) = math.radians(x)
+remainder(x, y) = math.remainder(x, y)
+sin(x) = math.sin(x) 
+sinh(x) = math.sinh(x)
+sqrt(x) = math.sqrt(x)
+tan(x) = math.tan(x) 
+tanh(x) = math.tanh(x)
+trunc(x) = math.trunc(x)

@@ -1,0 +1,14 @@
+[INFO]
+name = JSON
+description = Json formatting for Lumen.
+
+[IMPORTS]
+imports: json
+
+[CONSTANTS]
+
+
+[FUNCTIONS]
+loads(x, y, z) = json.loads(x, y, z)
+dumps(x, y, z) = json.dumps(x, y, z)
+

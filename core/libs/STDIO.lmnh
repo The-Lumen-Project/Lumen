@@ -1,0 +1,25 @@
+[INFO]
+name = STDIO
+description = Standard Input/Output operations
+
+[IMPORTS]
+imports: os
+
+[CONSTANTS]
+
+
+[FUNCTIONS]
+// Files
+open(x, y) = open(x, y)
+close() = close()
+read(x) = read(x)
+readline(x) = readline(x)
+// Writing
+write(x) = write(x)
+remove(x) = os.remove(x)
+
+// Inputs
+input(prompt) = input(prompt)
+inputStr(prompt) = str(input(prompt))
+inputInt(prompt) = int(input(prompt))
+inputFloat(prompt) = float(input(prompt))

@@ -1,0 +1,14 @@
+[INFO]
+name = DATE
+description = Datetime for Lumen.
+
+[IMPORTS]
+imports: datetime
+
+[CONSTANTS]
+
+
+[FUNCTIONS]
+now() = datetime.datetime.now()
+datetime(x, y, z) = datetime.datetime(x, y, z)
+

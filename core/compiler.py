@@ -4,7 +4,33 @@ import sys
 from lmnast import start, LumenParseError, LumenSemanticError
 import argparse
 import config
+import shutil
 from pathlib import Path
+
+def get_install_dir() -> str:
+    """
+    Get the directory where the Lumen compiler is installed.
+    Works on Windows/Linux/macOS and supports both script and frozen (PyInstaller) modes.
+    """
+    if getattr(sys, 'frozen', False):  # Running as PyInstaller EXE
+        return str(Path(sys.executable).resolve().parent)
+    else:  # Running as a Python script
+        return str(Path(__file__).resolve().parent)
+
+def in_venv() -> bool:
+    # Standard venv detection
+    if getattr(sys, "base_prefix", sys.prefix) != sys.prefix:
+        return True
+    if "VIRTUAL_ENV" in os.environ:
+        return True
+
+    # Extra check for WSL/Linux: see if 'activate' exists in parent dirs
+    exec_path = Path(sys.executable).resolve()
+    for parent in exec_path.parents:
+        if (parent / "bin" / "activate").exists():
+            return True
+
+    return False
 
 class LumenCompilerError(Exception):
     """Base exception class for Lumen compiler errors"""
@@ -92,9 +118,10 @@ class PythonCodeGenerator:
         self.static_vars = {}
         self.global_vars = {}
         self.functions = {}
+        self.libraries = {}
         self.indent_level = 0
-        self.labels = {}  # Track label positions for goto
-        self.gotos = []   # Track goto statements to validate
+        self.labels = {}
+        self.gotos = []
     
     def get_indent(self):
         return "    " * self.indent_level
@@ -238,14 +265,50 @@ class PythonCodeGenerator:
                                        f"labels inside functions can only be reached from within the same function")
 
     def compile_to_python(self, lmast):
-        """Compile Lumen AST to Python code with proper goto implementation"""
+        """Compile Lumen AST to Python code with library support"""
         if not isinstance(lmast, list):
             raise LumenCompilerError("Invalid AST: Expected list of statements")
 
         # First, collect and validate labels and gotos
         self.collect_labels_and_gotos(lmast)
-
         py_code = ""
+        
+        # Get the Lumen installation directory
+        lumen_install_dir = get_install_dir()
+        
+        # Add library imports at the top - use absolute path to Lumen install
+        py_code += "# Library imports\n"
+        py_code += "import sys\n"
+        py_code += "from pathlib import Path\n\n"
+        
+        # Add Lumen installation directory to Python path
+        py_code += f"# Add Lumen installation directory to path\n"
+        py_code += f"lumen_install_dir = Path(r'{lumen_install_dir}')\n"
+        py_code += f"sys.path.insert(0, str(lumen_install_dir))\n\n"
+        
+        # Now import from the Lumen installation directory
+        py_code += f"from lmnlib import load_library\n\n"
+        
+        # Add library loading code
+        py_code += "# Load libraries\n"
+        py_code += "install_dir = lumen_install_dir\n\n"
+        
+        # Process library directives first
+        for stmt in lmast:
+            if isinstance(stmt, (list, tuple)) and len(stmt) >= 2:
+                if stmt[0] == "include":
+                    lib_name = stmt[1]
+                    lib_var = lib_name.lower()
+                    self.libraries[lib_var] = lib_name
+                    py_code += f"{lib_var} = load_library('{lib_name}', system=True, install_dir=install_dir)\n"
+                elif stmt[0] == "import":
+                    package_name = stmt[1]
+                    pkg_var = package_name.lower()
+                    self.libraries[pkg_var] = package_name
+                    py_code += f"{pkg_var} = load_library('{package_name}', system=False, install_dir=install_dir)\n"
+        
+        if self.libraries:
+            py_code += "\n"
 
         # First pass: collect all static and global variables
         for stmt in lmast:
@@ -257,7 +320,7 @@ class PythonCodeGenerator:
                     var_type, name, value = stmt[1], stmt[2], stmt[3]
                     self.global_vars[name] = (var_type, value)
 
-        # Add static variables at the top
+        # Add static variables
         if self.static_vars:
             py_code += "# Static constants (immutable)\n"
             for name, (var_type, value) in self.static_vars.items():
@@ -265,7 +328,7 @@ class PythonCodeGenerator:
                 py_code += f"{name} = {formatted_value}\n"
             py_code += "\n"
 
-        # Add global variable declarations (initialize to None if no value)
+        # Add global variable declarations
         if self.global_vars:
             py_code += "# Global variables\n"
             for name, (var_type, value) in self.global_vars.items():
@@ -286,141 +349,59 @@ class PythonCodeGenerator:
         return py_code
 
     def generate_goto_implementation(self, lmast):
-        """Generate Python code using a much simpler goto approach"""
+        """Generate Python code using proper goto state machine"""
         py_code = ""
-        py_code += "# Simple goto implementation\n"
-        py_code += "def main_program():\n"
-        self.indent_level += 1
         
         # First, define all functions (they can't contain gotos)
         for stmt in lmast:
             if isinstance(stmt, (list, tuple)) and len(stmt) >= 2 and stmt[0] == "fun":
                 py_code += self.compile_single_statement(stmt)
         
-        # Now generate the main program with goto support
-        py_code += f"{self.get_indent()}# Main program execution\n"
+        # Generate main program with goto support
+        py_code += "# Main program with goto support\n"
+        py_code += "def main_program():\n"
+        self.indent_level += 1
         
-        # Create label mapping
-        label_positions = {}
-        main_statements = []
+        # Generate labels and statements mapping
+        non_function_statements = []
+        label_map = {}
         
-        for i, stmt in enumerate(lmast):
+        for stmt in lmast:
             if isinstance(stmt, (list, tuple)) and len(stmt) >= 2:
                 if stmt[0] == "label":
-                    label_positions[stmt[1]] = len(main_statements)
+                    label_map[stmt[1]] = len(non_function_statements)
                 elif stmt[0] != "fun":  # Skip function definitions
-                    main_statements.append(stmt)
+                    non_function_statements.append(stmt)
         
-        py_code += f"{self.get_indent()}statements = {repr(main_statements)}\n"
-        py_code += f"{self.get_indent()}labels = {repr(label_positions)}\n"
-        py_code += f"{self.get_indent()}pc = 0  # program counter\n\n"
+        py_code += f"{self.get_indent()}pc = 0\n"
+        py_code += f"{self.get_indent()}while pc < {len(non_function_statements)}:\n"
+        self.indent_level += 1
         
-        py_code += f"{self.get_indent()}while pc < len(statements):\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}stmt = statements[pc]\n"
-        py_code += f"{self.get_indent()}stmt_type = stmt[0]\n\n"
+        # Generate statement execution
+        for idx, stmt in enumerate(non_function_statements):
+            py_code += f"{self.get_indent()}if pc == {idx}:\n"
+            self.indent_level += 1
+            
+            if stmt[0] == "goto":
+                label_name = stmt[1]
+                if label_name in label_map:
+                    py_code += f"{self.get_indent()}pc = {label_map[label_name]}\n"
+                    py_code += f"{self.get_indent()}continue\n"
+                else:
+                    py_code += f"{self.get_indent()}raise RuntimeError(f'Undefined label: {label_name}')\n"
+            else:
+                # Execute the statement directly
+                stmt_code = self.compile_single_statement(stmt).strip()
+                if stmt_code:
+                    # Remove the indent from the statement and add our own
+                    lines = stmt_code.split('\n')
+                    for line in lines:
+                        if line.strip():
+                            py_code += f"{self.get_indent()}{line.strip()}\n"
+            
+            self.indent_level -= 1
         
-        # Handle different statement types
-        py_code += f"{self.get_indent()}if stmt_type == 'goto':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}label_name = stmt[1]\n"
-        py_code += f"{self.get_indent()}if label_name in labels:\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}pc = labels[label_name]\n"
-        py_code += f"{self.get_indent()}continue\n"
-        self.indent_level -= 1
-        py_code += f"{self.get_indent()}else:\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}raise RuntimeError(f'Undefined label: {{label_name}}')\n"
-        self.indent_level -= 2
-        
-        # Execute other statements inline
-        py_code += f"{self.get_indent()}elif stmt_type == 'declare':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}var_type, name, value, is_static = stmt[1], stmt[2], stmt[3], stmt[4]\n"
-        py_code += f"{self.get_indent()}if not is_static:\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}globals()[name] = eval(value, globals()) if isinstance(value, str) and not value.startswith(('\"', \"'\")) else value\n"
-        self.indent_level -= 2
-        
-        py_code += f"{self.get_indent()}elif stmt_type == 'assign':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}name, value = stmt[1], stmt[2]\n"
-        py_code += f"{self.get_indent()}globals()[name] = eval(value, globals()) if isinstance(value, str) and not value.startswith(('\"', \"'\")) else value\n"
-        self.indent_level -= 1
-        
-        py_code += f"{self.get_indent()}elif stmt_type == 'print':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}args = stmt[1]\n"
-        py_code += f"{self.get_indent()}print(*[eval(arg, globals()) if isinstance(arg, str) and not arg.startswith(('\"', \"'\")) else arg for arg in args])\n"
-        self.indent_level -= 1
-        
-        py_code += f"{self.get_indent()}elif stmt_type == 'inc':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}var_name = stmt[1]\n"
-        py_code += f"{self.get_indent()}globals()[var_name] = globals().get(var_name, 0) + 1\n"
-        self.indent_level -= 1
-        
-        py_code += f"{self.get_indent()}elif stmt_type == 'dec':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}var_name = stmt[1]\n"
-        py_code += f"{self.get_indent()}globals()[var_name] = globals().get(var_name, 0) - 1\n"
-        self.indent_level -= 1
-        
-        py_code += f"{self.get_indent()}elif stmt_type == 'call':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}func_name, args = stmt[1], stmt[2]\n"
-        py_code += f"{self.get_indent()}eval_args = [eval(arg, globals()) if isinstance(arg, str) and not arg.startswith(('\"', \"'\")) else arg for arg in args]\n"
-        py_code += f"{self.get_indent()}globals()[func_name](*eval_args)\n"
-        self.indent_level -= 1
-        
-        # Handle if statements
-        py_code += f"{self.get_indent()}elif stmt_type == 'if':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}condition, body = stmt[1], stmt[2]\n"
-        py_code += f"{self.get_indent()}if eval(condition, globals()):\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}for substmt in body:\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}if substmt[0] == 'goto':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}label_name = substmt[1]\n"
-        py_code += f"{self.get_indent()}if label_name in labels:\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}pc = labels[label_name]\n"
-        py_code += f"{self.get_indent()}continue\n"
-        self.indent_level -= 1
-        py_code += f"{self.get_indent()}else:\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}raise RuntimeError(f'Undefined label: {{label_name}}')\n"
-        self.indent_level -= 3
-        self.indent_level -= 1
-        
-        # Handle while statements
-        py_code += f"{self.get_indent()}elif stmt_type == 'while':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}condition, body = stmt[1], stmt[2]\n"
-        py_code += f"{self.get_indent()}while eval(condition, globals()):\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}for substmt in body:\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}if substmt[0] == 'goto':\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}label_name = substmt[1]\n"
-        py_code += f"{self.get_indent()}if label_name in labels:\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}pc = labels[label_name]\n"
-        py_code += f"{self.get_indent()}continue\n"
-        self.indent_level -= 1
-        py_code += f"{self.get_indent()}else:\n"
-        self.indent_level += 1
-        py_code += f"{self.get_indent()}raise RuntimeError(f'Undefined label: {{label_name}}')\n"
-        self.indent_level -= 3
-        self.indent_level -= 1
-        
-        # Increment program counter and continue
-        py_code += f"\n{self.get_indent()}pc += 1\n"
-        
+        py_code += f"{self.get_indent()}pc += 1\n"
         self.indent_level -= 1  # End while loop
         self.indent_level -= 1  # End function
         
@@ -446,7 +427,7 @@ class PythonCodeGenerator:
         return False
 
     def compile_single_statement(self, stmt):
-        """Compile a single statement to Python code"""
+        """Compile a single statement to Python code with library support"""
         py_code = ""
         
         if not isinstance(stmt, (list, tuple)) or len(stmt) < 2:
@@ -454,12 +435,37 @@ class PythonCodeGenerator:
 
         stmt_type = stmt[0]
 
-        if stmt_type == "declare":
+        # Handle library directives (skip in code generation since they're handled at top)
+        if stmt_type in ("include", "import"):
+            return py_code
+
+        # Handle library function calls
+        elif stmt_type == "lib_call":
+            lib_name, func_name, args = stmt[1], stmt[2], stmt[3]
+            lib_var = lib_name.lower()
+            
+            if lib_var not in self.libraries:
+                raise LumenSemanticError(f"Library '{lib_name}' not loaded")
+            
+            args_str = ", ".join(str(arg) for arg in args) if args else ""
+            py_code += f"{self.get_indent()}{lib_var}.{func_name}({args_str})\n"
+
+        # Handle library property access
+        elif stmt_type == "lib_access":
+            lib_name, member_name = stmt[1], stmt[2]
+            lib_var = lib_name.lower()
+            
+            if lib_var not in self.libraries:
+                raise LumenSemanticError(f"Library '{lib_name}' not loaded")
+            
+            # This would typically be used in assignments or expressions
+            py_code += f"{self.get_indent()}{lib_var}.{member_name}\n"
+
+        # All your existing statement handling code...
+        elif stmt_type == "declare":
             var_type, name, value, is_static = stmt[1], stmt[2], stmt[3], stmt[4]
             if not is_static:  # Regular variables (non-static)
-                # Don't format expressions, they need to be evaluated
-                if isinstance(value, str) and not (value.startswith(('"', "'"))) and not value.isdigit() and value.lower() not in ('true', 'false'):
-                    # This is an expression, keep it as-is
+                if self.is_expression(value):
                     py_code += f"{self.get_indent()}{name} = {value}\n"
                 else:
                     formatted_value = self.format_value(value, var_type)
@@ -467,8 +473,7 @@ class PythonCodeGenerator:
 
         elif stmt_type == "assign":
             name, value = stmt[1], stmt[2]
-            # Don't format expressions, they need to be evaluated
-            if isinstance(value, str) and not (value.startswith(('"', "'"))) and not value.isdigit() and value.lower() not in ('true', 'false'):
+            if self.is_expression(value):
                 py_code += f"{self.get_indent()}{name} = {value}\n"
             else:
                 formatted_value = self.format_value(value)
@@ -480,12 +485,21 @@ class PythonCodeGenerator:
             if not isinstance(stmt[1], list):
                 raise LumenSyntaxError("Print arguments must be a list")
 
-            # Process print arguments - don't quote expressions, handle commas properly
+            # Process print arguments properly
             args = []
             for arg in stmt[1]:
                 if arg == ",":
                     continue  # Skip comma tokens
-                if isinstance(arg, str) and not (arg.startswith(('"', "'"))) and not arg.isdigit() and arg not in ('True', 'False'):
+                
+                # Handle library access in print statements
+                if "." in arg and not (arg.startswith(('"', "'"))):
+                    # Check if it's library access
+                    parts = arg.split(".", 1)
+                    if len(parts) == 2 and parts[0].lower() in self.libraries:
+                        args.append(arg)  # Keep library access as-is
+                        continue
+                
+                if self.is_expression(arg):
                     args.append(arg)  # Keep expressions as-is
                 else:
                     args.append(self.format_value(arg))
@@ -601,12 +615,15 @@ class PythonCodeGenerator:
                     continue
 
                 stmt_type = stmt[0]
+                
+                if stmt_type in ("import", "include"):
+                    continue
 
                 if stmt_type == "declare":
                     var_type, name, value, is_static = stmt[1], stmt[2], stmt[3], stmt[4]
                     if not is_static:  # Regular variables (non-static)
                         # Don't format expressions, they need to be evaluated
-                        if isinstance(value, str) and not (value.startswith(('"', "'"))) and not value.isdigit() and value.lower() not in ('true', 'false'):
+                        if isinstance(value, str) and not (value.startswith(('"', "'"))) and not value.replace('.','').replace('-','').isdigit() and value.lower() not in ('true', 'false'):
                             py_code += f"{self.get_indent()}{name} = {value}\n"
                         else:
                             formatted_value = self.format_value(value, var_type)
@@ -615,7 +632,7 @@ class PythonCodeGenerator:
                 elif stmt_type == "assign":
                     name, value = stmt[1], stmt[2]
                     # Don't format expressions, they need to be evaluated
-                    if isinstance(value, str) and not (value.startswith(('"', "'"))) and not value.isdigit() and value.lower() not in ('true', 'false'):
+                    if isinstance(value, str) and not (value.startswith(('"', "'"))) and not value.replace('.','').replace('-','').isdigit() and value.lower() not in ('true', 'false'):
                         py_code += f"{self.get_indent()}{name} = {value}\n"
                     else:
                         formatted_value = self.format_value(value)
@@ -632,7 +649,7 @@ class PythonCodeGenerator:
                     for arg in stmt[1]:
                         if arg == ",":
                             continue  # Skip comma tokens
-                        if isinstance(arg, str) and not (arg.startswith(('"', "'"))) and not arg.isdigit() and arg not in ('True', 'False'):
+                        if isinstance(arg, str) and not (arg.startswith(('"', "'"))) and not arg.replace('.','').replace('-','').isdigit() and arg not in ('True', 'False'):
                             args.append(arg)  # Keep expressions as-is
                         else:
                             args.append(self.format_value(arg))
@@ -642,18 +659,17 @@ class PythonCodeGenerator:
                 elif stmt_type == "inc":
                     if len(stmt) != 2:
                         raise LumenSyntaxError("Invalid increment statement")
-                    # Don't need to check variable existence here - it's handled by the parser
                     py_code += f"{self.get_indent()}{stmt[1]} += 1\n"
 
                 elif stmt_type == "dec":
                     if len(stmt) != 2:
                         raise LumenSyntaxError("Invalid decrement statement")
-                    # Don't need to check variable existence here - it's handled by the parser
                     py_code += f"{self.get_indent()}{stmt[1]} -= 1\n"
 
                 elif stmt_type == "while":
                     if len(stmt) != 3:
                         raise LumenSyntaxError("Invalid while statement: expected condition and body")
+                    
                     py_code += f"{self.get_indent()}while {stmt[1]}:\n"
                     self.indent_level += 1
                     body_code = self.compile_statements(stmt[2])
@@ -777,14 +793,16 @@ def compile_to_python(lmast):
 def write_python_file(py_result, filename, debug=False):
     """Write Python code to file with error handling"""
     pyfilename = filename.replace(".lmn", ".py")
-    python_dir = "python"
     
     try:
-        ensure_output_directory(python_dir)
+        # Create python directory in the project folder (where the .lmn file is)
+        project_dir = Path(config.file).parent
+        python_dir = project_dir / "python"
+        ensure_output_directory(str(python_dir))
         
-        output_path = Path(python_dir) / pyfilename
+        output_path = python_dir / pyfilename
         
-        with open(output_path, "w") as out:
+        with open(output_path, "w", encoding='utf-8') as out:
             out.write(py_result)
         
         if debug:
@@ -801,63 +819,89 @@ def write_python_file(py_result, filename, debug=False):
 def compile_to_binary(python_file_path, debug=False):
     """Compile Python file to binary with error handling"""
     try:
-        if debug:
-            print("Installing PyInstaller...")
+        # Get args properly
+        parser = setup_argument_parser()
+        # Only parse known args to avoid conflicts
+        args, _ = parser.parse_known_args()
         
-        # Find the Python interpreter (not the lumen executable)
-        python_executable = sys.executable
-        # If we're running as lumen.exe, try to find the actual Python interpreter
-        if "lumen" in python_executable.lower() or python_executable.endswith(".exe"):
-            # Try common Python executable names
-            python_candidates = ["python", "python3", "py"]
-            for candidate in python_candidates:
+        venv = in_venv()
+        if debug:
+            print(f"VENV state: {venv}")
+        
+        nInputs = ["y","n",""]
+        inp = ""
+        
+        install_dir = Path(get_install_dir())
+        if os.name == "nt":
+            python_exe = os.path.join(install_dir, "python-files-lmn", "python.exe")
+        else:
+            python_exe = "python3"
+        
+        if os.name != "nt":
+            if not venv:
+                print("""\n!WARNING!\n
+PYTHON ON LINUX IS WEIRD!
+MY BEST RECOMMENDATION IS TO SETUP A
+VENV TO AVOID ERRORS!
+                """)
+                inp = input("CONTINUE? (y/N): ")
+                while inp.lower() not in nInputs:
+                    inp = input("CONTINUE? (y/N): ")
+            else:
+                inp = "y"
+                
+            if inp.lower() == nInputs[0]:  
+                if debug:
+                    print("Checking PyInstaller...")
                 try:
-                    # Check if this Python command exists
-                    result = subprocess.run([candidate, "--version"], capture_output=True, timeout=5)
-                    if result.returncode == 0:
-                        python_executable = candidate
-                        break
-                except (FileNotFoundError, subprocess.TimeoutExpired):
-                    continue
+                    subprocess.run([python_exe, "-m", "PyInstaller", "--version"], 
+                                 check=True, capture_output=True)
+                except subprocess.CalledProcessError:
+                    if debug:
+                        print("Installing PyInstaller...")
+                    subprocess.run([python_exe, "-m", "pip", "install", "PyInstaller"], 
+                                 check=True)
+            else:
+                raise LumenCompilerError("Compilation Cancelled!")
         
-        # Install PyInstaller
-        install_result = subprocess.run(
-            [python_executable, "-m", "pip", "install", "pyinstaller"],
-            capture_output=True,
-            text=True,
-            timeout=120  # 2 minute timeout
-        )
+        print("Compiling to binary...")
+        print("It is normal if the console hangs for a bit...")
         
-        if install_result.returncode != 0:
-            raise LumenCompilerError(f"Failed to install PyInstaller: {install_result.stderr}")
-        
-        if debug:
-            print("Compiling to binary...")
-        
-        # Compile with PyInstaller
-        compile_result = subprocess.run([
-            python_executable, "-m", "PyInstaller",
+        # Check if icon exists
+        icon_path = install_dir / "icon.ico"
+        compile_args = [
+            python_exe, "-m", "PyInstaller",
             "--onefile",
             "--hidden-import=lmnast",
-            "--hidden-import=config",
-            str(python_file_path)
-        ], capture_output=True, text=True, timeout=300)  # 5 minute timeout
+            "--hidden-import=config"
+        ]
+        
+        if icon_path.exists():
+            compile_args.extend(["--icon", str(icon_path)])
+        
+        compile_args.append(str(python_file_path))
+        
+        compile_result = subprocess.run(compile_args, 
+                                      capture_output=True, text=True, timeout=300)
         
         if compile_result.returncode != 0:
             raise LumenCompilerError(f"PyInstaller compilation failed: {compile_result.stderr}")
-        
-        if debug:
-            print("Binary compilation completed successfully")
+
+        print("Binary compilation completed successfully")
             
     except subprocess.TimeoutExpired:
         raise LumenCompilerError("Compilation timed out - the process took too long")
     except FileNotFoundError:
-        raise LumenCompilerError("Python interpreter not found")
+        if os.name == "nt":
+            raise LumenCompilerError("Bundled Python interpreter not found")
+        else:
+            raise LumenCompilerError("Python3 not found - please install Python")
     except Exception as e:
         raise LumenCompilerError(f"Unexpected error during binary compilation: {e}")
 
 def main():
     """Main function with comprehensive error handling"""
+    args = None
     try:
         # Parse arguments
         parser = setup_argument_parser()
@@ -947,7 +991,7 @@ def main():
         sys.exit(1)
     except Exception as e:
         print(f"Unexpected error: {e}")
-        if args.debug:
+        if args and args.debug:
             import traceback
             traceback.print_exc()
         sys.exit(1)

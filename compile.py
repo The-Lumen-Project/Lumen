@@ -2,7 +2,9 @@ import PyInstaller.__main__
 
 PyInstaller.__main__.run([
     'core/compiler.py',
-    '--onefile',
+    '--onedir',
     '--name','lumen',
-    '--icon','lumen.ico'
+    '--icon','lumen.ico',
+    '--clean',
+    '--noconfirm'
 ])

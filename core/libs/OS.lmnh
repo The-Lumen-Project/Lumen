@@ -1,0 +1,24 @@
+[INFO]
+name = OS
+description = System for OSes (OSs?)
+
+[IMPORTS]
+imports: os
+
+[CONSTANTS]
+os = os.name
+
+[FUNCTIONS]
+// Directory stuffs
+pwd() = os.getcwd()
+cd(x) = os.chdir(x)
+mkdir(x, y) = os.mkdir(x, y)
+ls(x, y) = os.listdir(x, y)
+rm(x, y) = os.rmdir(x, y)
+chmod(x, y) = os.chmod(x, y)
+chown(x, y, z) = os.chown(x, y, z)
+stat(x) = os.stat(x)
+rename(x, y) = os.rename(x, y)
+
+// Path stuffs (i know its botched but it works)
+pathjoin(x, y) = os.path.join(x, y)

@@ -1,0 +1,32 @@
+[INFO]
+name = INFO
+description = Standard information about the system.
+
+[IMPORTS]
+imports: platform
+
+[CONSTANTS]
+lmnver = 0.2.0
+
+[FUNCTIONS]
+// System Info
+os() = platform.system()
+cpu() = platform.processor()
+architecture() = platform.architecture()
+machine() = platform.machine()
+model() = platform.model()
+platform() = platform.platform()
+uname() = platform.uname()
+
+// Python Info
+pyver() = platform.python_version()
+pybuild() = platform.python_build()
+pycompiler() = platform.python_compiler()
+pyimplementation() = platform.python_implementation()
+pybranch() = platform.python_branch()
+
+// OS specific
+macver() = mac_ver()
+libcver() = libc_ver()
+win32ver() = win32_ver()
+
