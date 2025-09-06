@@ -601,21 +601,19 @@ We welcome contributions to make Lumen even better! Here's how you can help:
 5. Submit PR with clear description
 
 ---
-<!--
+
 ## 📚 Additional Resources
 
 <div align="center">
 
 | Resource | Description | Link |
 |----------|-------------|------|
-| 📖 **Tutorial** | Step-by-step learning guide | [Learn Lumen](https://tutorial.lumen-lang.org) |
-| 🏗️ **Examples** | Real-world code samples | [Examples Repository](https://github.com/lumen-lang/examples) |
-| 💬 **Community** | Join the discussion | [Discord Server](https://discord.gg/lumen) |
-| 🐛 **Issues** | Report bugs & request features | [GitHub Issues](https://github.com/lumen-lang/lumen/issues) |
-| 📋 **Changelog** | Version history & updates | [Releases](https://github.com/lumen-lang/lumen/releases) |
+| 📖 **Tutorial** | Step-by-step learning guide | [Learn Lumen](https://github.com/The-Lumen-Project/blob/main/Lumen/learn.md) |
+| 🐛 **Issues** | Report bugs & request features | [GitHub Issues](https://github.com/The-Lumen-Project/Lumen/issues) |
+| 📋 **Changelog** | Version history & updates | [Releases](https://github.com/The-Lumen-Project/Lumen/blob/main/CHANGELOG.md) |
 
 </div>
--->
+
 ---
 
 ## 📄 License
