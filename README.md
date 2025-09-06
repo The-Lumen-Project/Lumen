@@ -19,6 +19,7 @@
 
 ## Table of Contents
 - [Lumen](#lumen)
+- [Learn Lumen](/learn.md)
 - [Documentation](/docs.md)
 - [Contributors](#contributors)
 - [Changelog](/CHANGELOG.md)
